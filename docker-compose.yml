@@ -1,0 +1,30 @@
+# docker-compose.yml — File Manager (GitHub-backed, no database)
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in real values
+#      (GITHUB_OWNER, GITHUB_REPOSITORY, GITHUB_TOKEN, AUTH_SECRET are required)
+#   2. docker compose up -d --build
+#   3. Visit http://localhost:3000 → you will be redirected to /login
+#   4. First time? Visit /setup to create the first admin account
+#
+# All file storage and metadata lives in your GitHub repository.
+# No database container is needed.
+
+services:
+  filemanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: file-manager:latest
+    container_name: file-manager
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/robots.txt').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
