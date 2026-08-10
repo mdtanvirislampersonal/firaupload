@@ -1,13 +1,37 @@
 // ===========================================================================
-// Middleware — protect dashboard + protected API routes
+// Middleware — protect dashboard + protected API routes (Edge-compatible)
 // ---------------------------------------------------------------------------
-// Runs on the Edge Runtime. Uses next-auth/jwt getToken to check the session.
-// Wrapped in try/catch so that any unexpected error (missing AUTH_SECRET,
-// crypto issue, etc.) degrades gracefully — it treats the request as
-// unauthenticated and redirects/401s instead of crashing with a 500.
+// ROOT CAUSE OF PREVIOUS CRASH:
+//   next-auth/jwt's getToken() pulls in `jose`, `@panva/hkdf`, and `uuid`.
+//   On Vercel Edge Runtime the Node.js CJS build of `jose` (which uses
+//   Node's `crypto` module) gets bundled and crashes with
+//   MIDDLEWARE_INVOCATION_FAILED. The dynamic import() inside try/catch
+//   does NOT help because the module bundle itself fails to load.
+//
+// FIX:
+//   This middleware does NOT import next-auth/jwt. It only checks whether
+//   the NextAuth session cookie EXISTS (no JWT verification). The actual
+//   JWT verification happens server-side in:
+//     - dashboard/layout.tsx  → getServerSession(authOptions)
+//     - every API route        → getServerSessionUser()
+//   So even if a user sets a fake cookie to bypass the middleware, they
+//   still cannot access any protected data — all API routes verify the
+//   real JWT signature.
+//
+//   This is the officially recommended NextAuth + Next.js middleware
+//   pattern for Edge Runtime:
+//   https://nextjs.org/docs/app/building-your-application/routing/middleware
 // ===========================================================================
 
 import { NextResponse, type NextRequest } from "next/server";
+
+// NextAuth v4 cookie names:
+//   - "next-auth.session-token"              (development / HTTP)
+//   - "__Secure-next-auth.session-token"     (production / HTTPS)
+const SESSION_COOKIE_NAMES = [
+  "next-auth.session-token",
+  "__Secure-next-auth.session-token",
+];
 
 const PUBLIC_PATHS = [
   "/login",
@@ -17,26 +41,27 @@ const PUBLIC_PATHS = [
   "/uploads",
   "/sitemap.xml",
   "/robots.txt",
-  "/favicon.ico",
-  "/logo.svg",
-  "/_next",
 ];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p),
+    (p) => pathname === p || pathname.startsWith(p + "/"),
   );
 }
 
-export async function middleware(req: NextRequest) {
+function hasSessionCookie(req: NextRequest): boolean {
+  return SESSION_COOKIE_NAMES.some((name) => req.cookies.has(name));
+}
+
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Always allow public paths
+  // 1. Always allow public paths
   if (isPublic(pathname)) {
     return NextResponse.next();
   }
 
-  // Protected route prefixes
+  // 2. Only run auth check on protected route prefixes
   const protectedPrefixes = [
     "/dashboard",
     "/api/files",
@@ -52,24 +77,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Try to read the NextAuth JWT token. If anything goes wrong (missing
-  // secret, crypto error on edge, malformed cookie, ...) treat as
-  // unauthenticated rather than crashing with a 500.
-  let isAuthenticated = false;
-  try {
-    const { getToken } = await import("next-auth/jwt");
-    const token = await getToken({
-      req,
-      secret: process.env.AUTH_SECRET,
-    });
-    isAuthenticated = Boolean(token);
-  } catch (err) {
-    // Log to console (Vercel will show it) but don't crash.
-    console.error("[middleware] getToken failed:", err);
-    isAuthenticated = false;
-  }
-
-  if (!isAuthenticated) {
+  // 3. Check for session cookie existence (NO JWT verification here —
+  //    that happens server-side via getServerSession in the route handler)
+  if (!hasSessionCookie(req)) {
     // API requests get 401 JSON; page requests redirect to /login
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
@@ -87,8 +97,9 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
+  // Exclude static assets, Next internals, and public files from the
+  // middleware so it doesn't run on favicon, images, sitemap, etc.
   matcher: [
-    // Match all paths except static assets and Next internals
-    "/((?!_next/static|_next/image|favicon.ico|logo.svg|robots.txt|sitemap.xml|uploads).*)",
+    "/((?!_next/static|_next/image|favicon.ico|favicon.png|logo.svg|robots.txt|sitemap.xml|uploads|public).*)",
   ],
 };

@@ -1,0 +1,33 @@
+▲ Next.js 16.1.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://21.0.6.173:3000
+- Environments: .env
+
+✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+✓ Ready in 1132ms
+○ Compiling / ...
+ GET / 307 in 4.2s (compile: 4.1s, render: 132ms)
+ GET / 307 in 56ms (compile: 4ms, render: 52ms)
+ GET /login 200 in 1042ms (compile: 946ms, render: 96ms)
+ GET /setup 200 in 526ms (compile: 453ms, render: 73ms)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /dashboard 307 in 2.7s (compile: 2.6s, render: 172ms)
+ GET /robots.txt 200 in 993ms (compile: 980ms, render: 13ms)
+ GET /sitemap.xml 200 in 192ms (compile: 187ms, render: 5ms)
+ GET /favicon.png 404 in 427ms (compile: 352ms, render: 76ms)
+ GET /dashboard 307 in 108ms (compile: 4ms, render: 103ms)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/files 401 in 766ms (compile: 727ms, render: 40ms)
+ GET /api/stats 401 in 269ms (compile: 261ms, render: 8ms)
+n 269ms (compile: 261ms, render: 8ms)
