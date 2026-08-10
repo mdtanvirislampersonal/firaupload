@@ -103,3 +103,7 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|favicon.png|logo.svg|robots.txt|sitemap.xml|uploads|public).*)",
   ],
 };
+
+// Explicitly declare the Edge Runtime (default for middleware, but being
+// explicit avoids any ambiguity that could trip up Vercel's bundler).
+export const runtime = "edge";

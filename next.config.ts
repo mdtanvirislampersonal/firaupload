@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // NOTE: Do NOT set `output: "standalone"` — it breaks middleware bundling
+  // on Vercel. Vercel has its own deployment system and doesn't need
+  // standalone output. Standalone is only for Docker (see Dockerfile).
   typescript: {
     ignoreBuildErrors: true,
   },
