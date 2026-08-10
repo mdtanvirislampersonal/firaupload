@@ -1,33 +1,15 @@
 // ===========================================================================
 // Middleware — protect dashboard + protected API routes (Edge-compatible)
 // ---------------------------------------------------------------------------
-// ROOT CAUSE OF PREVIOUS CRASH:
-//   next-auth/jwt's getToken() pulls in `jose`, `@panva/hkdf`, and `uuid`.
-//   On Vercel Edge Runtime the Node.js CJS build of `jose` (which uses
-//   Node's `crypto` module) gets bundled and crashes with
-//   MIDDLEWARE_INVOCATION_FAILED. The dynamic import() inside try/catch
-//   does NOT help because the module bundle itself fails to load.
-//
-// FIX:
-//   This middleware does NOT import next-auth/jwt. It only checks whether
-//   the NextAuth session cookie EXISTS (no JWT verification). The actual
-//   JWT verification happens server-side in:
-//     - dashboard/layout.tsx  → getServerSession(authOptions)
-//     - every API route        → getServerSessionUser()
-//   So even if a user sets a fake cookie to bypass the middleware, they
-//   still cannot access any protected data — all API routes verify the
-//   real JWT signature.
-//
-//   This is the officially recommended NextAuth + Next.js middleware
-//   pattern for Edge Runtime:
-//   https://nextjs.org/docs/app/building-your-application/routing/middleware
+// This middleware does NOT import next-auth/jwt (which crashes Vercel's
+// Edge Runtime). It only checks whether the NextAuth session cookie
+// EXISTS. The actual JWT verification happens server-side in:
+//   - dashboard/layout.tsx  → getServerSession(authOptions)
+//   - every API route        → getServerSessionUser()
 // ===========================================================================
 
 import { NextResponse, type NextRequest } from "next/server";
 
-// NextAuth v4 cookie names:
-//   - "next-auth.session-token"              (development / HTTP)
-//   - "__Secure-next-auth.session-token"     (production / HTTPS)
 const SESSION_COOKIE_NAMES = [
   "next-auth.session-token",
   "__Secure-next-auth.session-token",
@@ -56,12 +38,12 @@ function hasSessionCookie(req: NextRequest): boolean {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 1. Always allow public paths
+  // Always allow public paths
   if (isPublic(pathname)) {
     return NextResponse.next();
   }
 
-  // 2. Only run auth check on protected route prefixes
+  // Only run auth check on protected route prefixes
   const protectedPrefixes = [
     "/dashboard",
     "/api/files",
@@ -77,10 +59,8 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 3. Check for session cookie existence (NO JWT verification here —
-  //    that happens server-side via getServerSession in the route handler)
+  // Check for session cookie existence
   if (!hasSessionCookie(req)) {
-    // API requests get 401 JSON; page requests redirect to /login
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { success: false, message: "Authentication required" },
@@ -97,13 +77,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Exclude static assets, Next internals, and public files from the
-  // middleware so it doesn't run on favicon, images, sitemap, etc.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|favicon.png|logo.svg|robots.txt|sitemap.xml|uploads|public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|favicon.png|logo.svg|robots.txt|sitemap.xml|uploads).*)",
   ],
 };
-
-// Explicitly declare the Edge Runtime (default for middleware, but being
-// explicit avoids any ambiguity that could trip up Vercel's bundler).
-export const runtime = "edge";
